@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ CyberWOC // Student Evaluation Portal</title>
+    <title>Suggestion Solution Weighted Chart</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -18,92 +18,108 @@
         const { useState, useEffect, useRef } = React;
 
         function App() {
+            // Step Wizard System Workflow State Profile: 1 = Rationale & Keywords Mapping, 2 = 10-Point Score Grid Matrix
+            const [currentPhase, setCurrentPhase] = useState(1);
+            
             const [solutionNames, setSolutionNames] = useState(["Custom Cloud Build", "SaaS Enterprise Tier", "Hybrid Open-Source Fork"]);
             const [objectives, setObjectives] = useState([
                 "Performance & Latency", "Longevity & Future-Proofing", "Ergonomics & UX Paradigm",
                 "CapEx / OpEx Efficiency", "Data Privacy Compliance", "Architectural Scalability",
                 "API Extensibility", "Cross-Platform Integration", "Service Level Agreement", "Security Architecture"
             ]);
+            
+            // Track which categories students choose to enable for this exercise
+            const [enabledObjectives, setEnabledObjectives] = useState(Array(10).fill(true));
+            
+            // Student keyword rationale tracking arrays bound directly into state
+            const [rationales, setRationales] = useState({});
+            
             const [weights, setWeights] = useState([0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10]);
-            const [scores, setScores] = useState(Array(10).fill(null).map(() => [50, 50, 50]));
+            // Matrix handles 10-point baseline calculations natively now
+            const [scores, setScores] = useState(Array(10).fill(null).map(() => [5.0, 5.0, 5.0]));
             const [teamName, setTeamName] = useState("Student Investigator Board");
             const [finalTotals, setFinalTotals] = useState([0.0, 0.0, 0.0]);
             
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
-            const totalWeight = weights.reduce((sum, w) => sum + (parseFloat(w) || 0), 0);
+            // Filter active mathematical elements based on student selections
+            const totalWeight = weights.reduce((sum, w, idx) => sum + (enabledObjectives[idx] ? (parseFloat(w) || 0) : 0), 0);
             const isBalanced = Math.abs(totalWeight - 1.0) < 0.001;
             const winnerIndex = finalTotals.indexOf(Math.max(...finalTotals));
-            const winnerString = isBalanced ? `${solutionNames[winnerIndex].toUpperCase()} (${finalTotals[winnerIndex].toFixed(2)} PTS)` : "HOLDING - CONFIGURATION FAULT";
+            const winnerString = isBalanced ? `${solutionNames[winnerIndex].toUpperCase()} (${finalTotals[winnerIndex].toFixed(2)} / 10 PTS)` : "HOLDING - CONFIGURATION FAULT";
 
-            // React lifecycle calculations pipeline
             useEffect(() => {
                 let totals = [0.0, 0.0, 0.0];
                 for (let r = 0; r < 10; r++) {
+                    if (!enabledObjectives[r]) continue;
                     let w = parseFloat(weights[r]) || 0;
                     for (let c = 0; c < 3; c++) {
-                        let score = parseInt(scores[r][c]) || 0;
-                        totals[c] += w * score;
+                        let score = parseFloat(scores[r][c]) || 0;
+                        totals[c] += w * score; // Scales up cleanly into 10-point limit constraints
                     }
                 }
                 setFinalTotals(totals);
-            }, [weights, scores]);
+            }, [weights, scores, enabledObjectives]);
 
-            // Update Chart graphics when math recalculates
             useEffect(() => {
-                if (chartInstance.current) {
+                if (chartInstance.current && currentPhase === 2) {
                     chartInstance.current.data.labels = solutionNames;
                     chartInstance.current.data.datasets[0].data = finalTotals;
                     chartInstance.current.update();
                 }
-            }, [finalTotals, solutionNames]);
+            }, [finalTotals, solutionNames, currentPhase]);
 
-            // Initialize Chart.js inside React DOM
             useEffect(() => {
-                const ctx = chartRef.current.getContext('2d');
-                chartInstance.current = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: solutionNames,
-                        datasets: [{
-                            data: finalTotals,
-                            backgroundColor: ['rgba(34, 211, 238, 0.8)', 'rgba(192, 132, 252, 0.8)', 'rgba(244, 114, 182, 0.8)'],
-                            borderColor: ['#22d3ee', '#c084fc', '#f472b6'],
-                            borderWidth: 1,
-                            borderRadius: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { max: 100, grid: { color: 'rgba(51, 65, 85, 0.1)' }, ticks: { color: '#64748b' } },
-                            x: { ticks: { color: '#64748b', font: { weight: 'bold' } } }
+                if (currentPhase === 2 && chartRef.current) {
+                    const ctx = chartRef.current.getContext('2d');
+                    chartInstance.current = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: solutionNames,
+                            datasets: [{
+                                data: finalTotals,
+                                backgroundColor: ['rgba(34, 211, 238, 0.8)', 'rgba(192, 132, 252, 0.8)', 'rgba(244, 114, 182, 0.8)'],
+                                borderColor: ['#22d3ee', '#c084fc', '#f472b6'],
+                                borderWidth: 1,
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { max: 10, grid: { color: 'rgba(51, 65, 85, 0.1)' }, ticks: { color: '#64748b' } },
+                                x: { ticks: { color: '#64748b', font: { weight: 'bold' } } }
+                            }
                         }
-                    }
-                });
+                    });
+                }
                 return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-            }, []);
+            }, [currentPhase]);
 
             const adjustScore = (r, c, delta) => {
                 const newScores = [...scores];
-                let current = parseInt(newScores[r][c]) || 0;
-                newScores[r][c] = Math.max(0, Math.min(100, current + delta));
+                let current = parseFloat(newScores[r][c]) || 0;
+                newScores[r][c] = Math.max(0, Math.min(10, +(current + delta).toFixed(1)));
                 setScores(newScores);
             };
 
             const handleScoreInput = (r, c, val) => {
                 const newScores = [...scores];
-                newScores[r][c] = val === "" ? "" : Math.max(0, Math.min(100, parseInt(val) || 0));
+                newScores[r][c] = val === "" ? "" : Math.max(0, Math.min(10, parseFloat(val) || 0));
                 setScores(newScores);
             };
 
-            const handleWeightInput = (idx, val) => {
-                const newWeights = [...weights];
-                newWeights[idx] = val;
-                setWeights(newWeights);
+            const toggleObjective = (idx) => {
+                const updated = [...enabledObjectives];
+                updated[idx] = !updated[idx];
+                setEnabledObjectives(updated);
+            };
+
+            const handleRationaleChange = (objName, val) => {
+                setRationales({ ...rationales, [objName]: val });
             };
 
             const publishDocument = async () => {
@@ -111,22 +127,32 @@
                     alert("Cannot generate report: Matrix total weight score must sum perfectly to 1.00");
                     return;
                 }
+                
+                // Map out active categories to pass rationales up into Python pipeline
+                const activeRationales = {};
+                objectives.forEach((obj, idx) => {
+                    if (enabledObjectives[idx]) {
+                        activeRationales[obj] = rationales[obj] || "Evaluated under standard structural compliance guidelines.";
+                    }
+                });
+
                 try {
                     const response = await fetch('/publish-pdf', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            solutionNames, objectives, weights: weights.map(w => parseFloat(w) || 0),
-                            scores, totals: finalTotals, winner: solutionNames[winnerIndex], teamName
+                            solutionNames, objectives: objectives.filter((_, i) => enabledObjectives[i]), 
+                            weights: weights.filter((_, i) => enabledObjectives[i]).map(w => parseFloat(w) || 0),
+                            scores: scores.filter((_, i) => enabledObjectives[i]), totals: finalTotals, 
+                            winner: solutionNames[winnerIndex], teamName, rationales: activeRationales
                         })
                     });
                     if (response.ok) {
-                        // Directly intercept Python binary response to initialize client browser download stream
                         const blob = await response.blob();
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `CyberWOC_Briefing_${teamName.replace(/\s+/g, '_')}.pdf`;
+                        a.download = `Strategic_System_Evaluation_Briefing.pdf`;
                         document.body.appendChild(a);
                         a.click();
                         a.remove();
@@ -139,108 +165,148 @@
             };
 
             return (
-                <div class="p-2 md:p-4 max-w-[1600px] mx-auto">
-                    {/* Header Panel */}
+                <div class="p-4 md:p-6 max-w-[1600px] mx-auto">
+                    {/* Simplified Layout Header Frame */}
                     <header class="border border-slate-800 bg-slate-950/80 backdrop-blur-md rounded-xl p-6 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div>
-                            <h1 class="text-xl font-bold tracking-wider text-sky-400">⚡ CYBERWOC // STUDENT REACT WORKSPACE</h1>
-                            <p class="text-xs text-slate-400 mt-1">Python Backend + React Frontend Multi-Criteria Analytics Engine</p>
+                            <h1 class="text-xl font-bold tracking-wider text-sky-400">Suggestion Solution Weighted Chart</h1>
+                            <p class="text-xs text-slate-400 mt-1">Analytical Matrix Workspace Profile Mode</p>
                         </div>
-                        <div class={`px-4 py-1.5 rounded text-xs font-mono border transition-all duration-300 ${isBalanced ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' : 'bg-rose-950/80 text-rose-400 border-rose-800'}`}>
-                            {isBalanced ? "MATRIX SYSTEM BALANCED [DEPLOYMENT READY]" : `CONFIGURATION FAULT: WEIGHTS MUST SUM TO 1.0 (CURRENT: ${totalWeight.toFixed(2)})`}
+                        <div class="flex items-center gap-4">
+                            <div class="bg-slate-900 border border-slate-800 rounded-lg p-1 flex gap-1 text-xs font-mono">
+                                <button onClick={() => setCurrentPhase(1)} class={`px-3 py-1.5 rounded transition-all ${currentPhase === 1 ? 'bg-sky-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}>PHASE 1: STRATEGY MAPPING</button>
+                                <button onClick={() => setCurrentPhase(2)} class={`px-3 py-1.5 rounded transition-all ${currentPhase === 2 ? 'bg-sky-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}>PHASE 2: 10-POINT SCORING</button>
+                            </div>
+                            <div class={`px-4 py-1.5 rounded text-xs font-mono border transition-all duration-300 ${isBalanced ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' : 'bg-rose-950/80 text-rose-400 border-rose-800'}`}>
+                                {isBalanced ? "WEIGHTS READY (1.00)" : `FAULT: WEIGHT SUM MUST EQUAL 1.0 (CURRENT: ${totalWeight.toFixed(2)})`}
+                            </div>
                         </div>
                     </header>
 
-                    {/* Master Layout Space */}
-                    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                        <section class="xl:col-span-2 space-y-6 bg-slate-900/40 border border-slate-800/80 rounded-xl p-6">
+                    {/* PHASE 1 VIEW MAPPING CONTAINER PANEL */}
+                    {currentPhase === 1 && (
+                        <div class="bg-slate-900/40 border border-slate-800 rounded-xl p-6 space-y-6">
                             <div>
-                                <h2 class="text-sm font-bold text-slate-400 tracking-wider mb-3">CANDIDATE ENTERPRISE ARCHITECTURE IDENTITY MAPPING</h2>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {solutionNames.map((name, idx) => (
-                                        <div key={idx}>
-                                            <label class="text-[11px] font-mono text-slate-500">Solution {idx + 1} Name Label:</label>
-                                            <input type="text" value={name} onChange={(e) => {
-                                                const updated = [...solutionNames]; updated[idx] = e.target.value; setSolutionNames(updated);
-                                            }} class="w-full mt-1 bg-slate-950 border border-slate-800 rounded px-3 py-1.5 font-semibold text-sm focus:border-sky-500 outline-none" />
-                                        </div>
-                                    ))}
-                                </div>
+                                <h2 class="text-base font-bold text-sky-400 mb-1">PHASE 1: CHOOSE STRATEGIC CATEGORIES & DEFINE RATIONALES</h2>
+                                <p class="text-xs text-slate-400">Select the target configuration criteria for the assignment. For each active element, you must type keyword justification arguments to unlock Phase 2 evaluation metrics mapping.</p>
                             </div>
+                            <div class="space-y-3">
+                                {objectives.map((obj, idx) => (
+                                    <div key={idx} class={`p-4 rounded-lg border transition-all flex flex-col md:flex-row md:items-center gap-4 ${enabledObjectives[idx] ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-950/10 border-slate-900/50 opacity-40'}`}>
+                                        <div class="flex items-center gap-3 md:w-1/4">
+                                            <input type="checkbox" checked={enabledObjectives[idx]} onChange={() => toggleObjective(idx)} class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-0" />
+                                            <span class="text-sm font-semibold text-slate-200">{obj}</span>
+                                        </div>
+                                        <div class="flex-1 flex gap-3 items-center">
+                                            <span class="text-[11px] font-mono text-slate-500 whitespace-nowrap">JUSTIFICATION KEYWORDS:</span>
+                                            <input type="text" disabled={!enabledObjectives[idx]} value={rationales[obj] || ""} onChange={(e) => handleRationaleChange(obj, e.target.value)} placeholder={enabledObjectives[idx] ? "e.g., legacy integration demands, severe bandwidth limitation constraints..." : "Category Disabled"} class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-xs outline-none focus:border-sky-500 disabled:opacity-50 text-slate-300" />
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[11px] font-mono text-slate-500">WEIGHT:</span>
+                                            <input type="number" disabled={!enabledObjectives[idx]} value={weights[idx]} onChange={(e) => {
+                                                const w = [...weights]; w[idx] = e.target.value; setWeights(w);
+                                            }} step="0.01" class="w-16 bg-slate-950 border border-slate-800 text-center font-mono py-1 rounded text-xs text-amber-400" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div class="flex justify-end pt-4">
+                                <button onClick={() => setCurrentPhase(2)} class="px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-sm transition-all shadow-md">
+                                    Proceed to Phase 2: Scoring Matrix →
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
-                            {/* Data Sheet Grid Matrix */}
-                            <div class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/20">
-                                <table class="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr class="border-b border-slate-800 bg-slate-950/80 text-xs font-mono text-slate-400">
-                                            <th class="p-4">Evaluation Objective Target Profile</th>
-                                            <th class="p-4 text-center w-24">Weight</th>
-                                            {solutionNames.map((name, idx) => <th key={idx} class="p-4 text-center">{name}</th>)}
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-800/50 text-sm">
-                                        {objectives.map((obj, rIdx) => (
-                                            <tr key={rIdx} class="hover:bg-slate-900/30 transition-colors">
-                                                <td class="p-3">
-                                                    <input type="text" value={obj} onChange={(e) => {
-                                                        const updated = [...objectives]; updated[rIdx] = e.target.value; setObjectives(updated);
-                                                    }} class="w-full bg-transparent border-b border-transparent focus:border-slate-700 px-2 py-1 outline-none text-slate-200" />
-                                                </td>
-                                                <td class="p-3">
-                                                    <input type="number" value={weights[rIdx]} onChange={(e) => handleWeightInput(rIdx, e.target.value)} step="0.01" min="0" max="1" class="w-20 bg-slate-950 text-center border border-slate-800 rounded py-1 font-mono text-amber-400 text-xs" />
-                                                </td>
-                                                {solutionNames.map((name, cIdx) => (
-                                                    <td key={cIdx} class="p-3">
-                                                        <div class="flex items-center justify-center gap-1.5 bg-slate-950 border border-slate-800 rounded p-1 max-w-[130px] mx-auto">
-                                                            <button onClick={() => adjustScore(rIdx, cIdx, -5)} class="text-xs text-slate-500 hover:text-slate-200 px-1.5 font-bold">-</button>
-                                                            <input type="number" value={scores[rIdx][cIdx]} onChange={(e) => handleScoreInput(rIdx, cIdx, e.target.value)} min="0" max="100" class="w-12 bg-transparent text-center font-mono text-xs text-slate-100 outline-none" />
-                                                            <button onClick={() => adjustScore(rIdx, cIdx, 5)} class="text-xs text-slate-500 hover:text-slate-200 px-1.5 font-bold">+</button>
-                                                        </div>
+                    {/* PHASE 2 VIEW MATRIX GRID CONTAINER PANEL */}
+                    {currentPhase === 2 && (
+                        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                            <section class="xl:col-span-2 space-y-6 bg-slate-900/40 border border-slate-800 rounded-xl p-6">
+                                <div>
+                                    <h2 class="text-sm font-bold text-slate-400 tracking-wider mb-3">CANDIDATE ENTERPRISE ARCHITECTURE IDENTITY MAPPING</h2>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {solutionNames.map((name, idx) => (
+                                            <div key={idx}>
+                                                <input type="text" value={name} onChange={(e) => {
+                                                    const updated = [...solutionNames]; updated[idx] = e.target.value; setSolutionNames(updated);
+                                                }} class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-1.5 font-semibold text-sm focus:border-sky-500 outline-none" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/20">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr class="border-b border-slate-800 bg-slate-950/80 text-xs font-mono text-slate-400">
+                                                <th class="p-4">Active Objective Matrix Target (Phase 1)</th>
+                                                <th class="p-4 text-center w-20">Weight</th>
+                                                {solutionNames.map((name, idx) => <th key={idx} class="p-4 text-center">{name}</th>)}
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-800/50 text-sm">
+                                            {objectives.map((obj, rIdx) => {
+                                                if (!enabledObjectives[rIdx]) return null;
+                                                return (
+                                                    <tr key={rIdx} class="hover:bg-slate-900/30 transition-colors">
+                                                        <td class="p-3 font-medium text-slate-300">
+                                                            <div>{obj}</div>
+                                                            <div class="text-[10px] text-slate-500 font-mono italic max-w-xs overflow-hidden text-ellipsis whitespace-nowrap">Arg: "{rationales[obj] || 'None Provided'}"</div>
+                                                        </td>
+                                                        <td class="p-3 text-center font-mono text-amber-400 text-xs">{parseFloat(weights[rIdx]).toFixed(2)}</td>
+                                                        {solutionNames.map((name, cIdx) => (
+                                                            <td key={cIdx} class="p-3">
+                                                                <div class="flex items-center justify-center gap-1.5 bg-slate-950 border border-slate-800 rounded p-1 max-w-[125px] mx-auto">
+                                                                    <button onClick={() => adjustScore(rIdx, cIdx, -0.5)} class="text-xs text-slate-500 hover:text-slate-200 px-1 font-bold">-</button>
+                                                                    <input type="number" value={scores[rIdx][cIdx]} onChange={(e) => handleScoreInput(rIdx, cIdx, e.target.value)} min="0" max="10" step="0.1" class="w-12 bg-transparent text-center font-mono text-xs text-slate-100 outline-none" />
+                                                                    <button onClick={() => adjustScore(rIdx, cIdx, 0.5)} class="text-xs text-slate-500 hover:text-slate-200 px-1 font-bold">+</button>
+                                                                </div>
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="bg-slate-950/60 font-bold border-t-2 border-slate-400 text-xs tracking-wide">
+                                                <td class="p-4 text-slate-400">TOTAL SCORE INDEX VECTOR (MAX 10.00):</td>
+                                                <td class="p-4 text-center font-mono text-amber-500">{totalWeight.toFixed(2)}</td>
+                                                {finalTotals.map((total, idx) => (
+                                                    <td key={idx} class={`p-4 text-center font-mono text-base ${idx === winnerIndex ? 'text-emerald-400 font-black' : 'text-sky-400'}`}>
+                                                        {total.toFixed(2)} / 10.0
                                                     </td>
                                                 ))}
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr class="bg-slate-950/60 font-bold border-t-2 border-slate-800 text-xs tracking-wide">
-                                            <td class="p-4 text-slate-400">TOTAL CALCULATED METRICS (MAX 100.00):</td>
-                                            <td class={`p-4 text-center font-mono ${isBalanced ? 'text-emerald-400' : 'text-rose-400'}`}>{totalWeight.toFixed(2)}</td>
-                                            {finalTotals.map((total, idx) => (
-                                                <td key={idx} class={`p-4 text-center font-mono text-base ${idx === winnerIndex ? 'text-emerald-400' : 'text-sky-400'}`}>
-                                                    {total.toFixed(2)}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </section>
-
-                        {/* Telemetry Layout Sidebar Column */}
-                        <section class="space-y-6 flex flex-col">
-                            <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-inner">
-                                <p class="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-widest mb-1">👑 LEADING CANDIDATE ARCHITECTURE TRAJECTORY</p>
-                                <h3 class="text-lg font-bold text-emerald-400 tracking-wide font-mono">{winnerString}</h3>
-                            </div>
-
-                            <div class="bg-slate-950 border border-slate-900 rounded-xl p-5 shadow-2xl h-64">
-                                <h3 class="text-xs font-bold text-sky-400 tracking-wider font-mono mb-4">DECISION OPTIMIZATION VECTOR INDEX</h3>
-                                <div class="relative w-full h-48">
-                                    <canvas ref={chartRef}></canvas>
+                                        </tfoot>
+                                    </table>
                                 </div>
-                            </div>
+                            </section>
 
-                            <div class="bg-slate-900/30 border border-slate-900 rounded-xl p-5 space-y-4">
-                                <div>
-                                    <label class="text-[11px] font-mono text-slate-500">STUDENT NAME / TEAM LOG ID:</label>
-                                    <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} class="w-full mt-1 bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-sm outline-none focus:border-slate-700" />
+                            <section class="space-y-6 flex flex-col">
+                                <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-inner">
+                                    <p class="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest mb-1">🏆 WINNING SO FAR</p>
+                                    <h3 class="text-lg font-bold text-emerald-400 tracking-wide font-mono">{winnerString}</h3>
                                 </div>
-                                <button onClick={publishDocument} class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm rounded-lg shadow-lg active:scale-[0.99] transition-all">
-                                    Publish Executive Briefing (PDF)
-                                </button>
-                            </div>
-                        </section>
-                    </div>
+
+                                <div class="bg-slate-950 border border-slate-900 rounded-xl p-5 shadow-2xl h-64">
+                                    <h3 class="text-xs font-bold text-sky-400 tracking-wider font-mono mb-4">SUGGESTION SOLUTION WEIGHTED CHART (10-PT MAX)</h3>
+                                    <div class="relative w-full h-48">
+                                        <canvas ref={chartRef}></canvas>
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-900/30 border border-slate-900 rounded-xl p-5 space-y-4">
+                                    <div>
+                                        <label class="text-[11px] font-mono text-slate-500">STUDENT INVESTIGATOR PANEL REGISTRATION ID:</label>
+                                        <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} class="w-full mt-1 bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-sm outline-none focus:border-slate-700" />
+                                    </div>
+                                    <button onClick={publishDocument} class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm rounded-lg shadow-lg active:scale-[0.99] transition-all">
+                                        Publish Executive Briefing (PDF)
+                                    </button>
+                                </div>
+                            </section>
+                        </div>
+                    )}
                 </div>
             );
         }
