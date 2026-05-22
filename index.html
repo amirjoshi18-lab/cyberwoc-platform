@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ CyberWOC // Student Evaluation Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-[#020617] text-slate-100 font-sans min-h-screen">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const [solutionNames, setSolutionNames] = useState(["Custom Cloud Build", "SaaS Enterprise Tier", "Hybrid Open-Source Fork"]);
+            const [objectives, setObjectives] = useState([
+                "Performance & Latency", "Longevity & Future-Proofing", "Ergonomics & UX Paradigm",
+                "CapEx / OpEx Efficiency", "Data Privacy Compliance", "Architectural Scalability",
+                "API Extensibility", "Cross-Platform Integration", "Service Level Agreement", "Security Architecture"
+            ]);
+            const [weights, setWeights] = useState([0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10]);
+            const [scores, setScores] = useState(Array(10).fill(null).map(() => [50, 50, 50]));
+            const [teamName, setTeamName] = useState("Student Investigator Board");
+            const [finalTotals, setFinalTotals] = useState([0.0, 0.0, 0.0]);
+            
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+
+            const totalWeight = weights.reduce((sum, w) => sum + (parseFloat(w) || 0), 0);
+            const isBalanced = Math.abs(totalWeight - 1.0) < 0.001;
+            const winnerIndex = finalTotals.indexOf(Math.max(...finalTotals));
+            const winnerString = isBalanced ? `${solutionNames[winnerIndex].toUpperCase()} (${finalTotals[winnerIndex].toFixed(2)} PTS)` : "HOLDING - CONFIGURATION FAULT";
+
+            // React lifecycle calculations pipeline
+            useEffect(() => {
+                let totals = [0.0, 0.0, 0.0];
+                for (let r = 0; r < 10; r++) {
+                    let w = parseFloat(weights[r]) || 0;
+                    for (let c = 0; c < 3; c++) {
+                        let score = parseInt(scores[r][c]) || 0;
+                        totals[c] += w * score;
+                    }
+                }
+                setFinalTotals(totals);
+            }, [weights, scores]);
+
+            // Update Chart graphics when math recalculates
+            useEffect(() => {
+                if (chartInstance.current) {
+                    chartInstance.current.data.labels = solutionNames;
+                    chartInstance.current.data.datasets[0].data = finalTotals;
+                    chartInstance.current.update();
+                }
+            }, [finalTotals, solutionNames]);
+
+            // Initialize Chart.js inside React DOM
+            useEffect(() => {
+                const ctx = chartRef.current.getContext('2d');
+                chartInstance.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: solutionNames,
+                        datasets: [{
+                            data: finalTotals,
+                            backgroundColor: ['rgba(34, 211, 238, 0.8)', 'rgba(192, 132, 252, 0.8)', 'rgba(244, 114, 182, 0.8)'],
+                            borderColor: ['#22d3ee', '#c084fc', '#f472b6'],
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { max: 100, grid: { color: 'rgba(51, 65, 85, 0.1)' }, ticks: { color: '#64748b' } },
+                            x: { ticks: { color: '#64748b', font: { weight: 'bold' } } }
+                        }
+                    }
+                });
+                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
+            }, []);
+
+            const adjustScore = (r, c, delta) => {
+                const newScores = [...scores];
+                let current = parseInt(newScores[r][c]) || 0;
+                newScores[r][c] = Math.max(0, Math.min(100, current + delta));
+                setScores(newScores);
+            };
+
+            const handleScoreInput = (r, c, val) => {
+                const newScores = [...scores];
+                newScores[r][c] = val === "" ? "" : Math.max(0, Math.min(100, parseInt(val) || 0));
+                setScores(newScores);
+            };
+
+            const handleWeightInput = (idx, val) => {
+                const newWeights = [...weights];
+                newWeights[idx] = val;
+                setWeights(newWeights);
+            };
+
+            const publishDocument = async () => {
+                if (!isBalanced) {
+                    alert("Cannot generate report: Matrix total weight score must sum perfectly to 1.00");
+                    return;
+                }
+                try {
+                    const response = await fetch('/publish-pdf', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            solutionNames, objectives, weights: weights.map(w => parseFloat(w) || 0),
+                            scores, totals: finalTotals, winner: solutionNames[winnerIndex], teamName
+                        })
+                    });
+                    if (response.ok) {
+                        // Directly intercept Python binary response to initialize client browser download stream
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `CyberWOC_Briefing_${teamName.replace(/\s+/g, '_')}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                    } else {
+                        alert("Server compilation protocol encountered an error.");
+                    }
+                } catch (err) {
+                    alert("Network error: Could not reach Python server backend pipeline.");
+                }
+            };
+
+            return (
+                <div class="p-2 md:p-4 max-w-[1600px] mx-auto">
+                    {/* Header Panel */}
+                    <header class="border border-slate-800 bg-slate-950/80 backdrop-blur-md rounded-xl p-6 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div>
+                            <h1 class="text-xl font-bold tracking-wider text-sky-400">⚡ CYBERWOC // STUDENT REACT WORKSPACE</h1>
+                            <p class="text-xs text-slate-400 mt-1">Python Backend + React Frontend Multi-Criteria Analytics Engine</p>
+                        </div>
+                        <div class={`px-4 py-1.5 rounded text-xs font-mono border transition-all duration-300 ${isBalanced ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' : 'bg-rose-950/80 text-rose-400 border-rose-800'}`}>
+                            {isBalanced ? "MATRIX SYSTEM BALANCED [DEPLOYMENT READY]" : `CONFIGURATION FAULT: WEIGHTS MUST SUM TO 1.0 (CURRENT: ${totalWeight.toFixed(2)})`}
+                        </div>
+                    </header>
+
+                    {/* Master Layout Space */}
+                    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        <section class="xl:col-span-2 space-y-6 bg-slate-900/40 border border-slate-800/80 rounded-xl p-6">
+                            <div>
+                                <h2 class="text-sm font-bold text-slate-400 tracking-wider mb-3">CANDIDATE ENTERPRISE ARCHITECTURE IDENTITY MAPPING</h2>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {solutionNames.map((name, idx) => (
+                                        <div key={idx}>
+                                            <label class="text-[11px] font-mono text-slate-500">Solution {idx + 1} Name Label:</label>
+                                            <input type="text" value={name} onChange={(e) => {
+                                                const updated = [...solutionNames]; updated[idx] = e.target.value; setSolutionNames(updated);
+                                            }} class="w-full mt-1 bg-slate-950 border border-slate-800 rounded px-3 py-1.5 font-semibold text-sm focus:border-sky-500 outline-none" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Data Sheet Grid Matrix */}
+                            <div class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/20">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="border-b border-slate-800 bg-slate-950/80 text-xs font-mono text-slate-400">
+                                            <th class="p-4">Evaluation Objective Target Profile</th>
+                                            <th class="p-4 text-center w-24">Weight</th>
+                                            {solutionNames.map((name, idx) => <th key={idx} class="p-4 text-center">{name}</th>)}
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800/50 text-sm">
+                                        {objectives.map((obj, rIdx) => (
+                                            <tr key={rIdx} class="hover:bg-slate-900/30 transition-colors">
+                                                <td class="p-3">
+                                                    <input type="text" value={obj} onChange={(e) => {
+                                                        const updated = [...objectives]; updated[rIdx] = e.target.value; setObjectives(updated);
+                                                    }} class="w-full bg-transparent border-b border-transparent focus:border-slate-700 px-2 py-1 outline-none text-slate-200" />
+                                                </td>
+                                                <td class="p-3">
+                                                    <input type="number" value={weights[rIdx]} onChange={(e) => handleWeightInput(rIdx, e.target.value)} step="0.01" min="0" max="1" class="w-20 bg-slate-950 text-center border border-slate-800 rounded py-1 font-mono text-amber-400 text-xs" />
+                                                </td>
+                                                {solutionNames.map((name, cIdx) => (
+                                                    <td key={cIdx} class="p-3">
+                                                        <div class="flex items-center justify-center gap-1.5 bg-slate-950 border border-slate-800 rounded p-1 max-w-[130px] mx-auto">
+                                                            <button onClick={() => adjustScore(rIdx, cIdx, -5)} class="text-xs text-slate-500 hover:text-slate-200 px-1.5 font-bold">-</button>
+                                                            <input type="number" value={scores[rIdx][cIdx]} onChange={(e) => handleScoreInput(rIdx, cIdx, e.target.value)} min="0" max="100" class="w-12 bg-transparent text-center font-mono text-xs text-slate-100 outline-none" />
+                                                            <button onClick={() => adjustScore(rIdx, cIdx, 5)} class="text-xs text-slate-500 hover:text-slate-200 px-1.5 font-bold">+</button>
+                                                        </div>
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="bg-slate-950/60 font-bold border-t-2 border-slate-800 text-xs tracking-wide">
+                                            <td class="p-4 text-slate-400">TOTAL CALCULATED METRICS (MAX 100.00):</td>
+                                            <td class={`p-4 text-center font-mono ${isBalanced ? 'text-emerald-400' : 'text-rose-400'}`}>{totalWeight.toFixed(2)}</td>
+                                            {finalTotals.map((total, idx) => (
+                                                <td key={idx} class={`p-4 text-center font-mono text-base ${idx === winnerIndex ? 'text-emerald-400' : 'text-sky-400'}`}>
+                                                    {total.toFixed(2)}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </section>
+
+                        {/* Telemetry Layout Sidebar Column */}
+                        <section class="space-y-6 flex flex-col">
+                            <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-inner">
+                                <p class="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-widest mb-1">👑 LEADING CANDIDATE ARCHITECTURE TRAJECTORY</p>
+                                <h3 class="text-lg font-bold text-emerald-400 tracking-wide font-mono">{winnerString}</h3>
+                            </div>
+
+                            <div class="bg-slate-950 border border-slate-900 rounded-xl p-5 shadow-2xl h-64">
+                                <h3 class="text-xs font-bold text-sky-400 tracking-wider font-mono mb-4">DECISION OPTIMIZATION VECTOR INDEX</h3>
+                                <div class="relative w-full h-48">
+                                    <canvas ref={chartRef}></canvas>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-900/30 border border-slate-900 rounded-xl p-5 space-y-4">
+                                <div>
+                                    <label class="text-[11px] font-mono text-slate-500">STUDENT NAME / TEAM LOG ID:</label>
+                                    <input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} class="w-full mt-1 bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-sm outline-none focus:border-slate-700" />
+                                </div>
+                                <button onClick={publishDocument} class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm rounded-lg shadow-lg active:scale-[0.99] transition-all">
+                                    Publish Executive Briefing (PDF)
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
